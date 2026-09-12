@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Paper Scissors - AI Battle Arena</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Google Fonts for arcade / modern tech look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header with Branding & Global Scoreboard -->
+    <header class="game-header">
+      <div class="header-titles">
+        <h1 class="logo-title">
+          <span class="rock-text">ROCK</span>
+          <span class="paper-text">PAPER</span>
+          <span class="scissor-text">SCISSORS</span>
+        </h1>
+        <p class="subtitle">AI-Powered Gesture Recognition • Player 1 vs CPU</p>
+      </div>
+
+      <!-- Scoreboard Display -->
+      <div class="scoreboard">
+        <div class="score-card player-score-card">
+          <span class="score-label">PLAYER 1</span>
+          <span class="score-val" id="player-score">0</span>
+        </div>
+        <div class="score-card tie-score-card">
+          <span class="score-label">TIES</span>
+          <span class="score-val" id="tie-score">0</span>
+        </div>
+        <div class="score-card cpu-score-card">
+          <span class="score-label">CPU</span>
+          <span class="score-val" id="cpu-score">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification / Alert Bar for Camera Permissions & Model Status -->
+    <div id="status-bar" class="status-bar info">
+      <span class="status-icon" id="status-icon">🤖</span>
+      <span id="status-message">Initializing game & AI model...</span>
+    </div>
+
+    <!-- Mode Selector Controls -->
+    <div class="mode-tabs">
+      <button id="btn-mode-camera" class="mode-tab active" onclick="switchMode('camera')">
+        <span class="tab-icon">📷</span> Camera Mode
+      </button>
+      <button id="btn-mode-upload" class="mode-tab" onclick="switchMode('upload')">
+        <span class="tab-icon">📁</span> Upload Image Mode
+      </button>
+    </div>
+
+    <!-- Arena: Two opposing sides -->
+    <main class="arena-grid">
+      <!-- Player 1 Side -->
+      <section class="player-panel user-panel" id="user-panel">
+        <div class="panel-header">
+          <div class="player-tag">
+            <span class="dot user-dot"></span>
+            <h2>PLAYER 1 (YOU)</h2>
+          </div>
+          <div class="badge mode-badge" id="current-mode-badge">Camera Live</div>
+        </div>
+
+        <!-- Camera Section View -->
+        <div id="camera-view" class="input-view-container">
+          <div class="media-frame" id="webcam-wrapper">
+            <div id="webcam-container"></div>
+            <!-- Canvas snapshot when locked -->
+            <canvas id="lock-snapshot-canvas" class="snapshot-canvas hidden"></canvas>
+            
+            <!-- Countdown Overlay -->
+            <div id="countdown-overlay" class="countdown-overlay hidden">
+              <span id="countdown-text">3</span>
+            </div>
+
+            <div class="frame-scanner" id="frame-scanner"></div>
+          </div>
+
+          <div class="input-controls">
+            <button id="btn-countdown-shoot" class="btn btn-primary" onclick="startCountdownShoot()">
+              <span class="btn-icon">⏱️</span> 3-2-1 Shoot!
+            </button>
+            <button id="btn-lock-image" class="btn btn-secondary" onclick="lockCurrentFrame()">
+              <span class="btn-icon">🔒</span> Lock Image
+            </button>
+            <button id="btn-unlock-camera" class="btn btn-outline hidden" onclick="unlockCamera()">
+              <span class="btn-icon">🔄</span> Unlock / Retake
+            </button>
+          </div>
+        </div>
+
+        <!-- Image Upload Section View (Fallback or Selected Mode) -->
+        <div id="upload-view" class="input-view-container hidden">
+          <div class="upload-dropzone" id="upload-dropzone" onclick="triggerFileInput()">
+            <input type="file" id="image-file-input" accept="image/*" class="file-input-hidden" onchange="handleImageUpload(event)" />
+            <div id="upload-placeholder" class="upload-placeholder">
+              <div class="upload-icon">📤</div>
+              <p class="upload-prompt"><strong>Click to browse</strong> or drag & drop gesture photo</p>
+              <span class="upload-hint">Supports JPG, PNG, WEBP showing Rock, Paper, or Scissors</span>
+            </div>
+            <img id="upload-preview-img" class="upload-preview hidden" alt="Uploaded gesture preview" />
+          </div>
+
+          <div class="input-controls">
+            <button id="btn-choose-file" class="btn btn-outline" onclick="triggerFileInput()">
+              <span class="btn-icon">📁</span> Select Another Image
+            </button>
+            <button id="btn-evaluate-upload" class="btn btn-primary" onclick="lockUploadedImage()" disabled>
+              <span class="btn-icon">🎯</span> Play With This Image
+            </button>
+          </div>
+        </div>
+
+        <!-- Player 1 Choice / Prediction Details -->
+        <div class="choice-status-box">
+          <div class="choice-display">
+            <span class="choice-label">Detected Gesture:</span>
+            <span class="choice-result" id="user-choice-result">Waiting for input...</span>
+          </div>
+
+          <!-- Model Confidence Breakdown Bars -->
+          <div class="probabilities-container" id="probabilities-container">
+            <div class="prob-row">
+              <span class="prob-name">✊ ROCK</span>
+              <div class="prob-bar-track"><div class="prob-bar-fill" id="prob-bar-rock" style="width: 0%"></div></div>
+              <span class="prob-val" id="prob-val-rock">0%</span>
+            </div>
+            <div class="prob-row">
+              <span class="prob-name">✋ PAPER</span>
+              <div class="prob-bar-track"><div class="prob-bar-fill" id="prob-bar-paper" style="width: 0%"></div></div>
+              <span class="prob-val" id="prob-val-paper">0%</span>
+            </div>
+            <div class="prob-row">
+              <span class="prob-name">✌️ SCISSOR</span>
+              <div class="prob-bar-track"><div class="prob-bar-fill" id="prob-bar-scissor" style="width: 0%"></div></div>
+              <span class="prob-val" id="prob-val-scissor">0%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center VS & Round Outcome Display -->
+      <div class="vs-column">
+        <div class="vs-badge">VS</div>
+        
+        <!-- Round Result Notification -->
+        <div class="outcome-card hidden" id="outcome-card">
+          <div class="outcome-headline" id="outcome-headline">ROUND OVER</div>
+          <div class="outcome-detail" id="outcome-detail">Rock beats Scissors</div>
+          <button class="btn btn-next-round" id="btn-next-round" onclick="resetForNextRound()">
+            Next Round ➔
+          </button>
+        </div>
+
+        <div class="round-counter">
+          ROUND <span id="round-number">1</span>
+        </div>
+      </div>
+
+      <!-- Player 2 Side (CPU) -->
+      <section class="player-panel cpu-panel" id="cpu-panel">
+        <div class="panel-header">
+          <div class="player-tag">
+            <span class="dot cpu-dot"></span>
+            <h2>PLAYER 2 (CPU)</h2>
+          </div>
+          <div class="badge cpu-badge">Randomized AI</div>
+        </div>
+
+        <div class="cpu-display-frame">
+          <div class="cpu-card" id="cpu-card">
+            <div class="cpu-icon-container" id="cpu-icon-container">
+              <span class="cpu-icon" id="cpu-icon">❓</span>
+            </div>
+            <div class="cpu-gesture-name" id="cpu-gesture-name">Choosing...</div>
+          </div>
+        </div>
+
+        <div class="cpu-intel-box">
+          <p class="cpu-intel-text" id="cpu-status-text">
+            CPU is waiting for your move to lock in!
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Action Bar -->
+    <footer class="game-footer">
+      <div class="footer-actions">
+        <button class="btn btn-secondary-outline" onclick="resetGameScores()">
+          <span class="btn-icon">🗑️</span> Reset Scores
+        </button>
+        <button class="btn btn-secondary-outline" onclick="toggleSound()">
+          <span class="btn-icon" id="sound-toggle-icon">🔊</span> Sound: <span id="sound-status">ON</span>
+        </button>
+        <button class="btn btn-secondary-outline" onclick="toggleHelpModal(true)">
+          <span class="btn-icon">❓</span> How to Play
+        </button>
+      </div>
+      <div class="footer-credits">
+        Powered by TensorFlow.js & Teachable Machine • Pure HTML/CSS/JS
+      </div>
+    </footer>
+  </div>
+
+  <!-- Help / Instructions Modal -->
+  <div class="modal-backdrop hidden" id="help-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>How to Play</h3>
+        <button class="btn-close" onclick="toggleHelpModal(false)">✕</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. Camera Mode</h4>
+        <p>Allow camera access when prompted. Point your hand at the webcam and make a <strong>Rock</strong> ✊, <strong>Paper</strong> ✋, or <strong>Scissors</strong> ✌️ gesture. Click <strong>"Lock Image"</strong> or use <strong>"3-2-1 Shoot!"</strong> to lock your move.</p>
+        
+        <h4>2. Upload Mode (Camera Fallback)</h4>
+        <p>If you don't allow camera access, or if you prefer uploading, switch to <strong>Upload Image Mode</strong>. Browse or drag-and-drop a photo of your hand gesture, then click <strong>"Play With This Image"</strong>.</p>
+        
+        <h4>3. Opponent</h4>
+        <p>The CPU will choose randomly once your move is locked. The winner is calculated immediately and the scoreboard updates automatically!</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="toggleHelpModal(false)">Got It!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TensorFlow & Teachable Machine CDN Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <!-- Main Game Script -->
+  <script src="game.js"></script>
+</body>
+</html>
